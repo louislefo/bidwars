@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BidWars // Retro Paintball Arena (45s)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&display=swap');
+    body { background-color: #030712; color: #FFFFFF; font-family: 'Press Start 2P', monospace; user-select: none; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    canvas { image-rendering: pixelated; border: 4px solid #1E293B; }
+    .crt-line {
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 4px;
+      pointer-events: none;
+    }
+    .hud-box { background-color: #0F172A; border: 2px solid #334155; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-4 relative">
+  <div class="crt-line fixed inset-0 z-40 pointer-events-none"></div>
+
+  <!-- Header Arena -->
+  <header class="w-full max-w-5xl flex flex-wrap justify-between items-center py-2 z-10 border-b-2 border-gray-800">
+    <div class="flex items-center gap-3">
+      <a href="/dashboard" class="text-[10px] text-gray-400 hover:text-amber-400">&lt; DASHBOARD</a>
+      <span class="text-xs text-amber-400">BIDWARS ARENA</span>
+    </div>
+
+    <!-- Timer 45s -->
+    <div class="flex items-center gap-2 bg-gray-900 border-2 border-amber-400 px-4 py-2 rounded">
+      <span class="text-[10px] text-gray-300">TIMER:</span>
+      <span id="timerDisplay" class="text-lg text-amber-400 font-bold">00:45</span>
+    </div>
+
+    <div class="flex gap-2">
+      <button id="startBtn" onclick="startBattle()" class="px-4 py-2 bg-amber-400 hover:bg-yellow-300 text-black text-[11px] font-bold rounded shadow-lg">
+        START BATTLE (45S)
+      </button>
+      <button onclick="toggleSpeed()" id="speedBtn" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-[10px] rounded">
+        1X
+      </button>
+      <button onclick="resetBattle()" class="px-3 py-2 bg-red-900/60 hover:bg-red-800 text-[10px] rounded text-red-300">
+        RESET
+      </button>
+    </div>
+  </header>
+
+  <!-- Big Name HUD -->
+  <div class="w-full max-w-5xl grid grid-cols-3 gap-3 my-2 z-10 text-[10px]">
+    <!-- Alpha -->
+    <div id="tankStatus_alpha" class="hud-box border-blue-500 p-2.5 rounded">
+      <div class="text-blue-400 font-bold text-xs">AGENT ALPHA</div>
+      <div class="text-[9px] text-gray-300 mt-1">ATTACK: RAPID TRIPLE SHOT</div>
+      <div class="flex justify-between items-center mt-2">
+        <span class="text-[8px] text-gray-400">$0.02 | 380MS</span>
+        <span id="hp_alpha" class="text-blue-400 font-bold text-sm">100%</span>
+      </div>
+    </div>
+
+    <!-- Beta -->
+    <div id="tankStatus_beta" class="hud-box border-red-500 p-2.5 rounded">
+      <div class="text-red-400 font-bold text-xs">AGENT BETA</div>
+      <div class="text-[9px] text-gray-300 mt-1">ATTACK: HEAVY CANNON BALL</div>
+      <div class="flex justify-between items-center mt-2">
+        <span class="text-[8px] text-gray-400">$0.08 | 1450MS</span>
+        <span id="hp_beta" class="text-red-400 font-bold text-sm">100%</span>
+      </div>
+    </div>
+
+    <!-- Gamma -->
+    <div id="tankStatus_gamma" class="hud-box border-amber-400 p-2.5 rounded">
+      <div class="text-amber-400 font-bold text-xs">AGENT GAMMA</div>
+      <div class="text-[9px] text-gray-300 mt-1">ATTACK: PIERCING LASER BEAM</div>
+      <div class="flex justify-between items-center mt-2">
+        <span class="text-[8px] text-gray-400">$0.05 | 160MS</span>
+        <span id="hp_gamma" class="text-amber-400 font-bold text-sm">100%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Battlefield Canvas -->
+  <div class="relative z-10 flex flex-col items-center">
+    <canvas id="arenaCanvas" width="800" height="460" class="shadow-2xl rounded"></canvas>
+
+    <!-- Overlay Victory Screen -->
+    <div id="victoryOverlay" class="hidden absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-6 text-center rounded border-4 border-amber-400 z-30">
+      <div class="text-xs text-amber-400 mb-2">--- 45S REVERSE AUCTION CONCLUDED ---</div>
+      <h2 id="winnerTitle" class="text-xl text-white mb-4">AGENT GAMMA VICTORIOUS</h2>
+      <div class="space-y-2 text-xs text-gray-300 mono hud-box p-4 rounded max-w-md w-full">
+        <div class="flex justify-between"><span>WINNING BID:</span><span id="wBid" class="text-white font-bold">$0.05 TEST_U</span></div>
+        <div class="flex justify-between text-amber-400"><span>BIDWARS FEE (5%):</span><span id="wFee" class="font-bold">+$0.0025 TEST_U</span></div>
+        <div class="flex justify-between text-emerald-400 border-t border-gray-700 pt-1"><span>NET PAYOUT:</span><span id="wNet" class="font-bold">$0.0475 TEST_U</span></div>
+        <div class="text-gray-400 text-[10px] pt-2">SETTLED ON BSC TESTNET (ERC-8183)</div>
+      </div>
+      <button onclick="resetBattle()" class="mt-4 px-6 py-2.5 bg-amber-400 text-black text-xs font-bold rounded">
+        START NEW COMBAT
+      </button>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="w-full max-w-5xl flex justify-between items-center py-2 text-[9px] text-gray-500 z-10 mono border-t border-gray-800">
+    <span>45S AMPHITHEATER PITCH MODE</span>
+    <span>ERC-8183 REVERSE AUCTION ARENA</span>
+  </footer>
+
+  <script>
+    const canvas = document.getElementById('arenaCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let speedMultiplier = 1;
+    let isRunning = false;
+    let timeLeft = 45; // Calibrated to 45 seconds!
+    let timerInterval = null;
+    let particles = [];
+    let splats = [];
+    let bullets = [];
+
+    // Synthesized Audio
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep(freq, duration, type = 'square') {
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch(e) {}
+    }
+
+    const bunkers = [
+      { x: 130, y: 80, w: 50, h: 50, color: '#1E3A8A' },
+      { x: 620, y: 80, w: 50, h: 50, color: '#991B1B' },
+      { x: 130, y: 330, w: 50, h: 50, color: '#1E3A8A' },
+      { x: 620, y: 330, w: 50, h: 50, color: '#991B1B' },
+      { x: 360, y: 190, w: 80, h: 80, color: '#B45309' },
+      { x: 260, y: 110, w: 30, h: 60, color: '#334155' },
+      { x: 510, y: 290, w: 30, h: 60, color: '#334155' },
+      { x: 260, y: 290, w: 30, h: 60, color: '#334155' },
+      { x: 510, y: 110, w: 30, h: 60, color: '#334155' }
+    ];
+
+    let tanks = [];
+
+    function initTanks() {
+      tanks = [
+        {
+          id: 'alpha',
+          name: 'AGENT ALPHA (BUDGET)',
+          attackType: 'triple_burst',
+          color: '#38BDF8',
+          trackColor: '#0369A1',
+          x: 90,
+          y: 230,
+          angle: 0,
+          turretAngle: 0,
+          hp: 220,
+          maxHp: 220,
+          speed: 1.4,
+          cooldown: 0,
+          rate: 38, // Fast triple shooter
+          alive: true
+        },
+        {
+          id: 'beta',
+          name: 'AGENT BETA (EXPERT)',
+          attackType: 'heavy_cannon',
+          color: '#EF4444',
+          trackColor: '#991B1B',
+          x: 710,
+          y: 110,
+          angle: Math.PI,
+          turretAngle: Math.PI,
+          hp: 290, // Heavy armor
+          maxHp: 290,
+          speed: 0.95,
+          cooldown: 0,
+          rate: 65, // Slow heavy cannon
+          alive: true
+        },
+        {
+          id: 'gamma',
+          name: 'AGENT GAMMA (EXPRESS)',
+          attackType: 'laser_beam',
+          color: '#F0B90B',
+          trackColor: '#B45309',
+          x: 710,
+          y: 350,
+          angle: Math.PI,
+          turretAngle: Math.PI,
+          hp: 260,
+          maxHp: 260,
+          speed: 1.5,
+          cooldown: 0,
+          rate: 48, // Fast laser bolt
+          alive: true
+        }
+      ];
+    }
+
+    function toggleSpeed() {
+      speedMultiplier = speedMultiplier === 1 ? 2 : (speedMultiplier === 2 ? 4 : 1);
+      document.getElementById('speedBtn').innerText = speedMultiplier + 'X';
+    }
+
+    function startBattle() {
+      if (isRunning) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      isRunning = true;
+      document.getElementById('startBtn').innerText = 'COMBAT EN COURS...';
+      document.getElementById('startBtn').classList.add('opacity-50');
+
+      timerInterval = setInterval(() => {
+        if (!isRunning) return;
+        timeLeft -= 1;
+        updateTimerDisplay();
+
+        if (timeLeft <= 0) {
+          endBattle();
+        }
+      }, 1000 / speedMultiplier);
+    }
+
+    function updateTimerDisplay() {
+      const s = timeLeft.toString().padStart(2, '0');
+      document.getElementById('timerDisplay').innerText = \`00:\${s}\`;
+    }
+
+    function resetBattle() {
+      isRunning = false;
+      clearInterval(timerInterval);
+      timeLeft = 45;
+      updateTimerDisplay();
+      document.getElementById('startBtn').innerText = 'START BATTLE (45S)';
+      document.getElementById('startBtn').classList.remove('opacity-50');
+      document.getElementById('victoryOverlay').classList.add('hidden');
+
+      bullets = [];
+      particles = [];
+      splats = [];
+      initTanks();
+      updateScoreboard();
+    }
+
+    function endBattle(winner = null) {
+      isRunning = false;
+      clearInterval(timerInterval);
+
+      if (!winner) {
+        const survivors = tanks.filter(t => t.alive);
+        winner = survivors.sort((a,b) => b.hp - a.hp)[0] || tanks[2];
+      }
+
+      playBeep(440, 0.25);
+      setTimeout(() => playBeep(880, 0.45), 200);
+
+      document.getElementById('winnerTitle').innerText = \`\${winner.name} GAGNE LE CONTRAT\`;
+      document.getElementById('winnerTitle').style.color = winner.color;
+
+      let price = 0.05, fee = 0.0025, net = 0.0475;
+      if (winner.id === 'alpha') { price = 0.02; fee = 0.0010; net = 0.0190; }
+      else if (winner.id === 'beta') { price = 0.08; fee = 0.0040; net = 0.0760; }
+
+      document.getElementById('wBid').innerText = \`$\${price.toFixed(2)} TEST_U\`;
+      document.getElementById('wFee').innerText = \`+$\${fee.toFixed(4)} TEST_U\`;
+      document.getElementById('wNet').innerText = \`$\${net.toFixed(4)} TEST_U\`;
+      document.getElementById('victoryOverlay').classList.remove('hidden');
+    }
+
+    function updateScoreboard() {
+      tanks.forEach(t => {
+        const pct = Math.max(0, Math.round((t.hp / t.maxHp) * 100));
+        const el = document.getElementById(\`hp_\${t.id}\`);
+        if (el) {
+          el.innerText = t.alive ? \`\${pct}%\` : 'DESTROYED';
+          el.style.color = t.alive ? t.color : '#64748B';
+        }
+      });
+    }
+
+    function update() {
+      if (!isRunning) return;
+
+      const aliveTanks = tanks.filter(t => t.alive);
+      if (aliveTanks.length <= 1) {
+        endBattle(aliveTanks[0]);
+        return;
+      }
+
+      // Damage boost ensures strict 45-second pacing
+      const damageMultiplier = timeLeft < 20 ? 1.8 : (timeLeft < 10 ? 2.5 : 1.1);
+
+      for (let s = 0; s < speedMultiplier; s++) {
+        tanks.forEach(tank => {
+          if (!tank.alive) return;
+
+          const enemies = tanks.filter(e => e.alive && e.id !== tank.id);
+          if (enemies.length === 0) return;
+
+          let target = enemies[0];
+          let minDist = 9999;
+          enemies.forEach(e => {
+            const d = Math.hypot(e.x - tank.x, e.y - tank.y);
+            if (d < minDist) { minDist = d; target = e; }
+          });
+
+          tank.turretAngle = Math.atan2(target.y - tank.y, target.x - tank.x);
+
+          tank.angle += (Math.random() - 0.5) * 0.2;
+          const nx = tank.x + Math.cos(tank.angle) * tank.speed;
+          const ny = tank.y + Math.sin(tank.angle) * tank.speed;
+
+          if (nx > 40 && nx < 760) tank.x = nx;
+          else tank.angle = Math.PI - tank.angle;
+
+          if (ny > 40 && ny < 420) tank.y = ny;
+          else tank.angle = -tank.angle;
+
+          bunkers.forEach(b => {
+            if (tank.x > b.x - 22 && tank.x < b.x + b.w + 22 &&
+                tank.y > b.y - 22 && tank.y < b.y + b.h + 22) {
+              tank.angle += Math.PI * 0.5;
+            }
+          });
+
+          // Distinct Attack Types per Tank
+          tank.cooldown++;
+          if (tank.cooldown >= tank.rate) {
+            tank.cooldown = 0;
+
+            if (tank.attackType === 'triple_burst') {
+              // Alpha: Triple rapid pellets
+              [-0.15, 0, 0.15].forEach(offset => {
+                bullets.push({
+                  x: tank.x + Math.cos(tank.turretAngle + offset) * 22,
+                  y: tank.y + Math.sin(tank.turretAngle + offset) * 22,
+                  vx: Math.cos(tank.turretAngle + offset) * 5.2,
+                  vy: Math.sin(tank.turretAngle + offset) * 5.2,
+                  color: tank.color,
+                  type: 'pellet',
+                  size: 4,
+                  dmg: 6.5 * damageMultiplier,
+                  ownerId: tank.id
+                });
+              });
+              playBeep(320, 0.05, 'square');
+            } else if (tank.attackType === 'heavy_cannon') {
+              // Beta: Massive slow cannonball
+              bullets.push({
+                x: tank.x + Math.cos(tank.turretAngle) * 24,
+                y: tank.y + Math.sin(tank.turretAngle) * 24,
+                vx: Math.cos(tank.turretAngle) * 3.6,
+                vy: Math.sin(tank.turretAngle) * 3.6,
+                color: tank.color,
+                type: 'heavy',
+                size: 9,
+                dmg: 22.0 * damageMultiplier,
+                ownerId: tank.id
+              });
+              playBeep(140, 0.15, 'sawtooth');
+            } else {
+              // Gamma: High velocity laser bolt
+              bullets.push({
+                x: tank.x + Math.cos(tank.turretAngle) * 24,
+                y: tank.y + Math.sin(tank.turretAngle) * 24,
+                vx: Math.cos(tank.turretAngle) * 6.5,
+                vy: Math.sin(tank.turretAngle) * 6.5,
+                color: tank.color,
+                type: 'laser',
+                size: 6,
+                dmg: 14.0 * damageMultiplier,
+                ownerId: tank.id
+              });
+              playBeep(480, 0.08, 'sine');
+            }
+          }
+        });
+
+        // Bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          b.x += b.vx;
+          b.y += b.vy;
+
+          if (b.x < 10 || b.x > 790 || b.y < 10 || b.y > 450) {
+            splats.push({ x: b.x, y: b.y, color: b.color, r: b.size });
+            bullets.splice(i, 1);
+            continue;
+          }
+
+          let hitBunker = false;
+          bunkers.forEach(bk => {
+            if (b.x > bk.x && b.x < bk.x + bk.w && b.y > bk.y && b.y < bk.y + bk.h) {
+              splats.push({ x: b.x, y: b.y, color: b.color, r: b.size + 2 });
+              hitBunker = true;
+            }
+          });
+          if (hitBunker) {
+            bullets.splice(i, 1);
+            continue;
+          }
+
+          tanks.forEach(t => {
+            if (t.alive && t.id !== b.ownerId) {
+              if (Math.hypot(t.x - b.x, t.y - b.y) < (18 + b.size/2)) {
+                t.hp -= b.dmg;
+                splats.push({ x: b.x, y: b.y, color: b.color, r: b.size + 4 });
+
+                for (let k = 0; k < 8; k++) {
+                  particles.push({
+                    x: b.x, y: b.y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    color: b.color,
+                    life: 20
+                  });
+                }
+
+                playBeep(110, 0.08, 'sawtooth');
+
+                if (t.hp <= 0) {
+                  t.alive = false;
+                  t.hp = 0;
+                  for (let k = 0; k < 35; k++) {
+                    particles.push({
+                      x: t.x, y: t.y,
+                      vx: (Math.random() - 0.5) * 7,
+                      vy: (Math.random() - 0.5) * 7,
+                      color: t.color,
+                      life: 45
+                    });
+                  }
+                  playBeep(70, 0.4, 'sawtooth');
+                }
+
+                bullets.splice(i, 1);
+                updateScoreboard();
+              }
+            }
+          });
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life--;
+          if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        if (splats.length > 180) splats.shift();
+      }
+    }
+
+    function draw() {
+      ctx.fillStyle = '#0F1E13';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      splats.forEach(s => {
+        ctx.fillStyle = s.color;
+        ctx.globalAlpha = 0.55;
+        ctx.fillRect(s.x - s.r/2, s.y - s.r/2, s.r, s.r);
+      });
+      ctx.globalAlpha = 1.0;
+
+      bunkers.forEach(b => {
+        ctx.fillStyle = b.color;
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.fillRect(b.x + 3, b.y + 3, b.w - 6, 4);
+      });
+
+      // Bullets rendering per attack type
+      bullets.forEach(b => {
+        ctx.fillStyle = b.color;
+        if (b.type === 'heavy') {
+          ctx.fillRect(b.x - 5, b.y - 5, 10, 10);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+        } else if (b.type === 'laser') {
+          ctx.fillRect(b.x - 6, b.y - 2, 12, 4);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(b.x - 3, b.y - 1, 6, 2);
+        } else {
+          ctx.fillRect(b.x - 2, b.y - 2, 5, 5);
+        }
+      });
+
+      // Tanks rendering + LARGE READABLE NAMES
+      tanks.forEach(tank => {
+        if (!tank.alive) {
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(tank.x - 14, tank.y - 14, 28, 28);
+          ctx.strokeStyle = '#0F172A';
+          ctx.strokeRect(tank.x - 14, tank.y - 14, 28, 28);
+          return;
+        }
+
+        ctx.save();
+        ctx.translate(tank.x, tank.y);
+
+        ctx.fillStyle = tank.trackColor;
+        ctx.fillRect(-18, -16, 36, 7);
+        ctx.fillRect(-18, 9, 36, 7);
+
+        ctx.fillStyle = tank.color;
+        ctx.fillRect(-14, -11, 28, 22);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-14, -11, 28, 22);
+
+        ctx.rotate(tank.turretAngle);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, -3, 20, 6);
+        ctx.fillStyle = tank.trackColor;
+        ctx.fillRect(-7, -7, 14, 14);
+
+        ctx.restore();
+
+        // HP Bar
+        const pct = Math.max(0, tank.hp / tank.maxHp);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(tank.x - 24, tank.y - 28, 48, 6);
+        ctx.fillStyle = pct > 0.4 ? tank.color : '#EF4444';
+        ctx.fillRect(tank.x - 23, tank.y - 27, 46 * pct, 4);
+
+        // BIGGER READABLE NAME BADGE FOR AMPHI
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+        ctx.fillRect(tank.x - 36, tank.y - 44, 72, 13);
+        ctx.strokeStyle = tank.color;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(tank.x - 36, tank.y - 44, 72, 13);
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '8px "Press Start 2P"';
+        ctx.textAlign = 'center';
+        ctx.fillText(tank.id.toUpperCase(), tank.x, tank.y - 34);
+      });
+
+      particles.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 4, 4);
+      });
+
+      requestAnimationFrame(() => {
+        update();
+        draw();
+      });
+    }
+
+    initTanks();
+    draw();
+  </script>
+</body>
+</html>

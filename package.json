@@ -1,0 +1,10 @@
+{
+  "name": "bidwars-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.24.0",
+  "scripts": {
+    "build": "pnpm --filter bidwars-agent run build",
+    "dev": "pnpm --filter bidwars-agent run dev"
+  }
+}

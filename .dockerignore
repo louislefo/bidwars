@@ -1,0 +1,8 @@
+node_modules
+dist
+.git
+.studio/build-locks
+.studio/logs
+.gemini
+.claude
+.cursor
